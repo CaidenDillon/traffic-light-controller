@@ -2,60 +2,52 @@
 #include <iostream>
 #include <thread>
 
-enum class Phase {
-    NS_GREEN,
-    NS_YELLOW,
-    EW_GREEN,
-    EW_YELLOW
-};
+using namespace std::chrono_literals;
+
+enum class Phase { NS_GREEN, NS_YELLOW, EW_GREEN, EW_YELLOW };
 
 struct TrafficLight {
     Phase phase{Phase::NS_GREEN};
-    int timer{0}; // seconds elapsed in current phase
+    std::chrono::seconds elapsed{0s}; // time spent in current phase
 };
 
-constexpr int GREEN_DURATION  = 5;
-constexpr int YELLOW_DURATION = 2;
+constexpr auto GREEN_DURATION  = 5s;
+constexpr auto YELLOW_DURATION = 2s;
 
-void tick(TrafficLight& tl) {
-    using std::cout;
+constexpr std::chrono::seconds duration_for(Phase p) {
+    switch (p) {
+        case Phase::NS_GREEN:  return GREEN_DURATION;
+        case Phase::NS_YELLOW: return YELLOW_DURATION;
+        case Phase::EW_GREEN:  return GREEN_DURATION;
+        case Phase::EW_YELLOW: return YELLOW_DURATION;
+    }
+    return 0s; // unreachable in practice
+}
 
+constexpr Phase next_phase(Phase p) {
+    switch (p) {
+        case Phase::NS_GREEN:  return Phase::NS_YELLOW;
+        case Phase::NS_YELLOW: return Phase::EW_GREEN;
+        case Phase::EW_GREEN:  return Phase::EW_YELLOW;
+        case Phase::EW_YELLOW: return Phase::NS_GREEN;
+    }
+    return Phase::NS_GREEN;
+}
+
+void render(const TrafficLight& tl) {
     switch (tl.phase) {
-        case Phase::NS_GREEN:
-            cout << "NS: GREEN, EW: RED\n";
-            ++tl.timer;
-            if (tl.timer >= GREEN_DURATION) {
-                tl.phase = Phase::NS_YELLOW;
-                tl.timer = 0;
-            }
-            break;
+        case Phase::NS_GREEN:  std::cout << "NS: GREEN, EW: RED\n";   break;
+        case Phase::NS_YELLOW: std::cout << "NS: YELLOW, EW: RED\n";  break;
+        case Phase::EW_GREEN:  std::cout << "NS: RED, EW: GREEN\n";   break;
+        case Phase::EW_YELLOW: std::cout << "NS: RED, EW: YELLOW\n";  break;
+    }
+}
 
-        case Phase::NS_YELLOW:
-            cout << "NS: YELLOW, EW: RED\n";
-            ++tl.timer;
-            if (tl.timer >= YELLOW_DURATION) {
-                tl.phase = Phase::EW_GREEN;
-                tl.timer = 0;
-            }
-            break;
-
-        case Phase::EW_GREEN:
-            cout << "NS: RED, EW: GREEN\n";
-            ++tl.timer;
-            if (tl.timer >= GREEN_DURATION) {
-                tl.phase = Phase::EW_YELLOW;
-                tl.timer = 0;
-            }
-            break;
-
-        case Phase::EW_YELLOW:
-            cout << "NS: RED, EW: YELLOW\n";
-            ++tl.timer;
-            if (tl.timer >= YELLOW_DURATION) {
-                tl.phase = Phase::NS_GREEN;
-                tl.timer = 0;
-            }
-            break;
+void advance(TrafficLight& tl, std::chrono::seconds dt) {
+    tl.elapsed += dt;
+    if (tl.elapsed >= duration_for(tl.phase)) {
+        tl.phase = next_phase(tl.phase);
+        tl.elapsed = 0s;
     }
 }
 
@@ -63,7 +55,8 @@ int main() {
     TrafficLight tl;
 
     while (true) {
-        tick(tl);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        render(tl);
+        advance(tl, 1s);
+        std::this_thread::sleep_for(1s);
     }
 }
